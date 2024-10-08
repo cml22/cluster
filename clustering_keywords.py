@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import seaborn as sns
-import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from collections import Counter
+import nltk
 
 nltk.download('stopwords')
 nltk.download('wordnet')
@@ -18,7 +18,7 @@ def preprocess_text(text):
     lemmatizer = WordNetLemmatizer()
     stop_words = set(stopwords.words('french'))
     words = text.split()
-    words = [lemmatizer.lemmatize(word) for word in words if word.lower() not in stop_words]
+    words = [lemmatizer.lemmatize(word) for word in words if word.lower() not in stop_words and len(word) > 2]
     return ' '.join(words)
 
 # Charger le fichier CSV
@@ -36,19 +36,19 @@ if uploaded_file is not None:
             vectorizer = TfidfVectorizer()
             X = vectorizer.fit_transform(df['Processed'])
 
-            model = DBSCAN(eps=0.5, min_samples=2, metric='cosine')
+            # Sélectionner le nombre de clusters
+            num_clusters = st.slider("Nombre de clusters souhaité :", min_value=2, max_value=20, value=5)
+
+            # KMeans pour le clustering
+            model = KMeans(n_clusters=num_clusters, random_state=42)
             clusters = model.fit_predict(X)
             df['Cluster'] = clusters
-
-            unique_clusters = set(clusters)
-            if -1 in unique_clusters:
-                unique_clusters.remove(-1)
 
             st.subheader("Sujets Parents des Clusters")
 
             cluster_info = {}
 
-            for cluster in unique_clusters:
+            for cluster in set(clusters):
                 words = df[df['Cluster'] == cluster]['Requêtes les plus fréquentes'].tolist()
                 
                 # Compter la fréquence des mots pour trouver le sujet parent
