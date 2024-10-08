@@ -18,7 +18,7 @@ if uploaded_file is not None:
     st.write("Aperçu des données :", df.head())
 
     # Affiche les colonnes disponibles
-    st.write("Colonnes disponibles :", df.columns)
+    st.write("Colonnes disponibles :", df.columns.tolist())  # Affiche sous forme de liste
 
     # Vérifie si la colonne 'Requête' existe
     if 'Requête' in df.columns:
