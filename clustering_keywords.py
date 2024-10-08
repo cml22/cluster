@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 from collections import Counter
+import re
 
 # Charger le fichier CSV
 uploaded_file = st.file_uploader("Téléverser un fichier CSV", type=["csv"])
@@ -35,16 +36,26 @@ if uploaded_file is not None:
                 st.error(f"Erreur lors du clustering KMeans : {str(e)}")
                 st.stop()
 
-            # Déterminer le mot-clé dominant par cluster
-            def get_dominant_term(cluster_num):
+            # Déterminer le sujet parent par cluster
+            def get_parent_term(cluster_num):
                 cluster_terms = df[df['Cluster'] == cluster_num]['Requêtes les plus fréquentes']
-                all_words = ' '.join(cluster_terms).split()
-                most_common_word, _ = Counter(all_words).most_common(1)[0]  # Récupérer le mot le plus fréquent
-                return most_common_word
+                # Récupérer les mots et les normaliser
+                all_words = ' '.join(cluster_terms).lower()
+                # Supprimer les caractères spéciaux et diviser en mots
+                words = re.findall(r'\b\w+\b', all_words)
+                # Compter la fréquence des mots
+                word_counts = Counter(words)
+                # Filtrer les mots peu significatifs (par exemple, moins de 3 caractères)
+                filtered_words = {word: count for word, count in word_counts.items() if len(word) > 2}
+                # Retourner le mot avec la plus haute fréquence ou un groupe de mots similaires
+                if filtered_words:
+                    most_common_word, _ = filtered_words.most_common(1)[0]
+                    return most_common_word
+                return "Inconnu"
 
-            df['Nom du Cluster'] = df['Cluster'].apply(get_dominant_term)
+            df['Nom du Cluster'] = df['Cluster'].apply(get_parent_term)
 
-            # Afficher les clusters et leur nom dominant
+            # Afficher les clusters et leur nom parent
             st.write("Clusters créés :")
             st.write(df[['Requêtes les plus fréquentes', 'Cluster', 'Nom du Cluster']])
 
