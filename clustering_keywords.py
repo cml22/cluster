@@ -2,43 +2,73 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import DBSCAN
-import nltk
+import matplotlib.pyplot as plt
+import numpy as np
 
-# Assure-toi que NLTK est prêt (ajoute ceci si nécessaire)
-nltk.download('punkt')
+# Fonction pour récupérer le mot-clé principal de chaque cluster
+def get_cluster_name(df, labels):
+    cluster_names = {}
+    for cluster_id in set(labels):
+        if cluster_id != -1:  # Exclude outliers
+            cluster_data = df[labels == cluster_id]
+            # Calcul du mot-clé principal en fonction des occurrences de TF-IDF
+            main_keyword = cluster_data["Requêtes les plus fréquentes"].iloc[0]
+            cluster_names[cluster_id] = main_keyword
+        else:
+            cluster_names[cluster_id] = "Outliers"
+    return cluster_names
 
-# Titre de l'application
-st.title("Clustering de Mots-Clés")
-
-# Upload du fichier CSV
-uploaded_file = st.file_uploader("Téléchargez votre fichier CSV", type="csv")
+# Fonction pour uploader le fichier
+uploaded_file = st.file_uploader("Téléversez le fichier CSV contenant les requêtes", type=["csv"])
 
 if uploaded_file is not None:
+    # Lecture du fichier CSV
     df = pd.read_csv(uploaded_file)
-    df.columns = df.columns.str.strip()  # Supprime les espaces autour des noms de colonnes
-    st.write("Aperçu des données :", df.head())
 
-    # Affiche les colonnes disponibles
-    st.write("Colonnes disponibles :", df.columns.tolist())  # Affiche sous forme de liste
-
-    # Vérifie si la colonne 'Requêtes les plus fréquentes' existe
-    if 'Requêtes les plus fréquentes' in df.columns:
-        # Traitement et clustering des données
-        st.write("Traitement en cours...")
-
-        # Exemple d'utilisation de TfidfVectorizer
-        vectorizer = TfidfVectorizer()
+    # Vérification que les colonnes attendues existent
+    if "Requêtes les plus fréquentes" in df.columns and "Clics" in df.columns and "Impressions" in df.columns:
+        
+        # Vectorisation des requêtes
+        vectorizer = TfidfVectorizer(stop_words='french')
         X = vectorizer.fit_transform(df['Requêtes les plus fréquentes'])
 
-        # Exemple de clustering avec DBSCAN
-        clustering = DBSCAN(eps=0.5, min_samples=5).fit(X.toarray())
+        # Application du clustering DBSCAN
+        dbscan = DBSCAN(eps=0.5, min_samples=2, metric='cosine')
+        labels = dbscan.fit_predict(X)
 
-        # Ajouter une nouvelle colonne pour le cluster dans le DataFrame
-        df['Cluster'] = clustering.labels_
+        # Ajouter les labels de clusters dans le DataFrame
+        df['Cluster'] = labels
 
-        # Afficher les résultats
-        st.write("Résultats du clustering :", df)
+        # Récupérer le nom des clusters basés sur le mot-clé le plus représenté
+        cluster_names = get_cluster_name(df, labels)
+
+        # Afficher les clusters avec leur nom
+        df['Nom du Cluster'] = df['Cluster'].map(cluster_names)
+
+        # Affichage des résultats
+        st.write("Résultats du clustering :")
+        st.dataframe(df)
+
+        # Visualisation des clusters
+        fig, ax = plt.subplots()
+        unique_labels = set(labels)
+
+        colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
+
+        for k, col in zip(unique_labels, colors):
+            if k == -1:
+                col = [0, 0, 0, 1]  # Black for outliers
+
+            class_member_mask = (labels == k)
+
+            xy = X.toarray()[class_member_mask]
+            ax.plot(xy[:, 0], xy[:, 1], 'o', markerfacecolor=tuple(col),
+                    markeredgecolor='k', markersize=6)
+
+        plt.title('Représentation des clusters de requêtes')
+        st.pyplot(fig)
+
     else:
-        st.error("La colonne 'Requêtes les plus fréquentes' n'existe pas dans le fichier CSV. Veuillez vérifier le nom de la colonne.")
+        st.error("Les colonnes 'Requêtes les plus fréquentes', 'Clics', 'Impressions' sont manquantes.")
 else:
-    st.warning("Veuillez télécharger un fichier CSV contenant les requêtes.")
+    st.info("Veuillez téléverser un fichier CSV.")
