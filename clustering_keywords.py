@@ -3,8 +3,16 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
+import re
 
-# Fonction pour extraire les mots-clés les plus fréquents d'un cluster
+# Fonction pour extraire des mots-clés significatifs pour nommer les clusters
+def extract_significant_terms(keywords):
+    # Fonction pour normaliser les termes
+    keywords = [re.sub(r'\d+', '', k) for k in keywords]  # Supprime les chiffres
+    keywords = [k.strip().lower() for k in keywords]  # Mise en minuscule
+    return keywords
+
+# Fonction pour extraire les noms de clusters basés sur des mots-clés significatifs
 def get_cluster_names(df, labels, num_clusters):
     cluster_names = []
     for i in range(num_clusters):
@@ -34,7 +42,7 @@ if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
     st.write("Données chargées :")
     st.write(df.head())  # Afficher les premières lignes du DataFrame pour vérification
-    
+
     # Vérifie si l'une des colonnes attendues est présente
     expected_columns = ['Requêtes les plus fréquentes', 'Clics', 'Impressions', 'CTR', 'Position']
     if not any(col in df.columns for col in expected_columns):
@@ -58,9 +66,12 @@ else:
 # Use .empty to check if the keywords are empty
 if isinstance(keywords, pd.Series) and not keywords.empty:
     # Continue with the clustering process
+    # Normaliser les termes
+    normalized_keywords = extract_significant_terms(keywords)
+
     # Vectorize the keywords using TF-IDF
     vectorizer = TfidfVectorizer()
-    X = vectorizer.fit_transform(keywords)
+    X = vectorizer.fit_transform(normalized_keywords)
 
     # Clustering using KMeans
     num_clusters = st.slider("Nombre de clusters", 2, 10, 5)
@@ -70,7 +81,7 @@ if isinstance(keywords, pd.Series) and not keywords.empty:
     # Add cluster labels to the data
     df['cluster'] = kmeans.labels_
 
-    # Assigner des noms aux clusters basés sur les mots-clés les plus fréquents
+    # Assigner des noms aux clusters basés sur les mots-clés les plus significatifs
     cluster_names = get_cluster_names(df, kmeans.labels_, num_clusters)
     df['Cluster Name'] = [cluster_names[label] for label in df['cluster']]
 
@@ -79,15 +90,20 @@ if isinstance(keywords, pd.Series) and not keywords.empty:
 
     # Visualisation sous forme de bulles
     plt.figure(figsize=(10, 6))
-    plt.scatter(cluster_data['Nombre de Mots-Clés'], cluster_data['Total Clics'], s=cluster_data['Total Impressions']/100, alpha=0.5)
+    plt.scatter(cluster_data['Nombre de Mots-Clés'], cluster_data['Total Clics'], s=cluster_data['Total Impressions'] / 100, alpha=0.5)
+
+    # Ajouter les noms de clusters avec annotations visuelles
+    for i in range(len(cluster_data)):
+        plt.annotate(f"{cluster_data['Cluster'][i]} (N={cluster_data['Nombre de Mots-Clés'][i]})", 
+                     (cluster_data['Nombre de Mots-Clés'][i], cluster_data['Total Clics'][i]),
+                     textcoords="offset points", 
+                     xytext=(0,10), 
+                     ha='center')
+
     plt.title('Visualisation des Clusters')
     plt.xlabel('Nombre de Mots-Clés')
     plt.ylabel('Total Clics')
     plt.grid()
-    
-    # Ajouter les noms de clusters
-    for i in range(len(cluster_data)):
-        plt.annotate(cluster_data['Cluster'][i], (cluster_data['Nombre de Mots-Clés'][i], cluster_data['Total Clics'][i]))
 
     st.pyplot(plt)
 
