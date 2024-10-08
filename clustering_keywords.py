@@ -49,7 +49,8 @@ if uploaded_file is not None:
                 filtered_words = {word: count for word, count in word_counts.items() if len(word) > 2}
                 # Retourner le mot avec la plus haute fréquence ou un groupe de mots similaires
                 if filtered_words:
-                    most_common_word, _ = filtered_words.most_common(1)[0]
+                    # Utiliser Counter pour trouver le mot le plus commun
+                    most_common_word, _ = Counter(filtered_words).most_common(1)[0]
                     return most_common_word
                 return "Inconnu"
 
