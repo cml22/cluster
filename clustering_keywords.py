@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -36,11 +36,12 @@ if uploaded_file is not None:
             vectorizer = TfidfVectorizer()
             X = vectorizer.fit_transform(df['Processed'])
 
-            # Sélectionner le nombre de clusters
-            num_clusters = st.slider("Nombre de clusters souhaité :", min_value=2, max_value=20, value=5)
+            # Ajuster les paramètres de DBSCAN
+            eps = st.slider("Distance maximale entre deux échantillons pour les considérer comme dans le même voisinage (eps) :", 0.1, 1.0, 0.5, 0.1)
+            min_samples = st.slider("Nombre minimum d'échantillons dans un voisinage pour qu'un point soit considéré comme un point central :", 1, 10, 5)
 
-            # KMeans pour le clustering
-            model = KMeans(n_clusters=num_clusters, random_state=42)
+            # DBSCAN pour le clustering
+            model = DBSCAN(eps=eps, min_samples=min_samples)
             clusters = model.fit_predict(X)
             df['Cluster'] = clusters
 
@@ -49,6 +50,9 @@ if uploaded_file is not None:
             cluster_info = {}
 
             for cluster in set(clusters):
+                if cluster == -1:
+                    continue  # Ignorer le bruit
+
                 words = df[df['Cluster'] == cluster]['Requêtes les plus fréquentes'].tolist()
                 
                 # Compter la fréquence des mots pour trouver le sujet parent
