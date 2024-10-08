@@ -14,7 +14,7 @@ if uploaded_file is not None:
     num_clusters = st.slider("Sélectionnez le nombre de clusters", min_value=2, max_value=20, value=5, step=1)
 
     # Vectorisation TF-IDF
-    vectorizer = TfidfVectorizer(stop_words='french')
+    vectorizer = TfidfVectorizer(stop_words='french', token_pattern=r"(?u)\b\w\w+\b")
     X = vectorizer.fit_transform(df['Requêtes les plus fréquentes'])
 
     # Clustering avec KMeans
