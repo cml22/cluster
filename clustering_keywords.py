@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 from collections import Counter
-import re
+import matplotlib.pyplot as plt
 
 # Charger le fichier CSV
 uploaded_file = st.file_uploader("Téléverser un fichier CSV", type=["csv"])
@@ -12,7 +12,7 @@ if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         st.write(df.head())  # Afficher les premières lignes du fichier
 
-        # Vérification si la colonne existe bien
+        # Vérification si la colonne existe
         if 'Requêtes les plus fréquentes' not in df.columns:
             st.error("La colonne 'Requêtes les plus fréquentes' n'existe pas dans le fichier CSV.")
         else:
@@ -31,39 +31,38 @@ if uploaded_file is not None:
             try:
                 model = KMeans(n_clusters=num_clusters, random_state=42)
                 model.fit(X)
-                df['Cluster'] = model.labels_
+                clusters = model.labels_
+                df['Cluster'] = clusters
             except Exception as e:
-                st.error(f"Erreur lors du clustering KMeans : {str(e)}")
+                st.error(f"Erreur lors du clustering : {str(e)}")
                 st.stop()
 
-            # Déterminer le sujet parent par cluster
-            def get_parent_term(cluster_num):
-                cluster_terms = df[df['Cluster'] == cluster_num]['Requêtes les plus fréquentes']
-                # Récupérer les mots et les normaliser
-                all_words = ' '.join(cluster_terms).lower()
-                # Supprimer les caractères spéciaux et diviser en mots
-                words = re.findall(r'\b\w+\b', all_words)
-                # Compter la fréquence des mots
-                word_counts = Counter(words)
-                # Filtrer les mots peu significatifs (par exemple, moins de 3 caractères)
-                filtered_words = {word: count for word, count in word_counts.items() if len(word) > 2}
-                # Retourner le mot avec la plus haute fréquence ou un groupe de mots similaires
-                if filtered_words:
-                    # Utiliser Counter pour trouver le mot le plus commun
-                    most_common_word, _ = Counter(filtered_words).most_common(1)[0]
-                    return most_common_word
-                return "Inconnu"
+            # Calculer le nombre de mots par cluster
+            cluster_word_count = Counter(clusters)
 
-            df['Nom du Cluster'] = df['Cluster'].apply(get_parent_term)
+            # Afficher les clusters
+            st.subheader("Clusters et mots associés")
+            for cluster in range(num_clusters):
+                st.write(f"**Cluster {cluster}:**")
+                words = df[df['Cluster'] == cluster]['Requêtes les plus fréquentes'].tolist()
+                st.write(", ".join(words))
 
-            # Afficher les clusters et leur nom parent
-            st.write("Clusters créés :")
-            st.write(df[['Requêtes les plus fréquentes', 'Cluster', 'Nom du Cluster']])
+            # Visualisation des clusters
+            fig, ax = plt.subplots()
+            ax.bar(cluster_word_count.keys(), cluster_word_count.values())
+            ax.set_xlabel("Cluster")
+            ax.set_ylabel("Nombre de mots")
+            ax.set_title("Nombre de mots par cluster")
+            st.pyplot(fig)
 
-            # Exporter le résultat en CSV
-            csv_export = df.to_csv(index=False)
-            st.download_button("Télécharger le fichier clusterisé", csv_export, "clusters.csv", "text/csv")
+            # Filtrage des clusters
+            st.subheader("Filtrer les clusters")
+            clusters_to_keep = st.multiselect("Sélectionnez les clusters à garder", list(range(num_clusters)), default=list(range(num_clusters)))
+
+            # Filtrer le DataFrame selon les clusters sélectionnés
+            filtered_df = df[df['Cluster'].isin(clusters_to_keep)]
+            st.write("DataFrame filtré:")
+            st.write(filtered_df)
+
     except Exception as e:
         st.error(f"Erreur lors du traitement du fichier : {str(e)}")
-else:
-    st.write("Veuillez téléverser un fichier CSV.")
