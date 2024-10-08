@@ -1,49 +1,45 @@
 import streamlit as st
 import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
-from nltk.corpus import stopwords
-import matplotlib.pyplot as plt
-import nltk
-
-nltk.download('stopwords')
+from collections import Counter
 
 # Charger le fichier CSV
-uploaded_file = st.file_uploader("Choisissez un fichier CSV", type="csv")
+uploaded_file = st.file_uploader("Téléverser un fichier CSV", type=["csv"])
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
-    
-    # Vérifier la colonne 'Requêtes les plus fréquentes'
-    if 'Requêtes les plus fréquentes' not in df.columns:
-        st.error("Le fichier CSV doit contenir la colonne 'Requêtes les plus fréquentes'.")
-    else:
-        # Vectorisation des requêtes
-        vectorizer = CountVectorizer(stop_words=stopwords.words('french'))
-        X = vectorizer.fit_transform(df['Requêtes les plus fréquentes'])
+    st.write(df.head())  # Afficher les premières lignes du fichier
 
-        # Clustering avec KMeans
-        kmeans = KMeans(n_clusters=5, random_state=42)
-        kmeans.fit(X)
-        df['Nom du Cluster'] = kmeans.labels_
+    # Sélectionner le nombre de clusters avec un curseur
+    num_clusters = st.slider("Sélectionnez le nombre de clusters", min_value=2, max_value=20, value=5, step=1)
 
-        # Trouver le mot-clé le plus représenté pour nommer les clusters
-        terms = vectorizer.get_feature_names_out()
-        order_centroids = kmeans.cluster_centers_.argsort()[:, ::-1]
-        cluster_names = {}
+    # Vectorisation TF-IDF
+    vectorizer = TfidfVectorizer(stop_words='french')
+    X = vectorizer.fit_transform(df['Requêtes les plus fréquentes'])
 
-        for i in range(5):
-            top_keywords = [terms[ind] for ind in order_centroids[i, :5]]
-            cluster_names[i] = ', '.join(top_keywords)
+    # Clustering avec KMeans
+    model = KMeans(n_clusters=num_clusters, random_state=42)
+    model.fit(X)
 
-        df['Nom du Cluster'] = df['Nom du Cluster'].map(cluster_names)
+    # Ajouter les labels de clusters au dataframe
+    df['Cluster'] = model.labels_
 
-        # Afficher le résultat
-        st.write(df)
+    # Déterminer le mot-clé dominant par cluster
+    def get_dominant_term(cluster_num):
+        cluster_terms = df[df['Cluster'] == cluster_num]['Requêtes les plus fréquentes']
+        all_words = ' '.join(cluster_terms).split()
+        most_common_word, _ = Counter(all_words).most_common(1)[0]  # Récupérer le mot le plus fréquent
+        return most_common_word
 
-        # Visualisation
-        plt.figure(figsize=(10, 6))
-        df['Nom du Cluster'].value_counts().plot(kind='bar')
-        plt.title('Répartition des clusters')
-        plt.xlabel('Nom du Cluster')
-        plt.ylabel('Nombre de requêtes')
-        st.pyplot(plt)
+    df['Nom du Cluster'] = df['Cluster'].apply(get_dominant_term)
+
+    # Afficher les clusters et leur nom dominant
+    st.write("Clusters créés :")
+    st.write(df[['Requêtes les plus fréquentes', 'Cluster', 'Nom du Cluster']])
+
+    # Exporter le résultat en CSV
+    csv_export = df.to_csv(index=False)
+    st.download_button("Télécharger le fichier clusterisé", csv_export, "clusters.csv", "text/csv")
+
+else:
+    st.write("Veuillez téléverser un fichier CSV.")
