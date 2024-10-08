@@ -1,9 +1,9 @@
+import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import DBSCAN
 import nltk
 
-# Assure-toi de télécharger les ressources NLTK si ce n'est pas déjà fait
 nltk.download('punkt')
 
 def generate_cluster_name(cluster_keywords):
@@ -14,26 +14,32 @@ def generate_cluster_name(cluster_keywords):
     else:
         return "Autre"
 
-# Charge les données
-df = pd.read_csv('Requêtes.csv')
+# Titre de l'application
+st.title("Clustering de Mots-Clés")
 
-# Applique le TF-IDF et le clustering
-vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(df['Requêtes les plus fréquentes'])
-db = DBSCAN(eps=0.5, min_samples=2).fit(X.toarray())
+# Chargement du fichier CSV
+uploaded_file = st.file_uploader("Choisissez un fichier CSV", type='csv')
 
-# Ajoute les clusters au DataFrame
-df['Cluster'] = db.labels_
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
 
-# Nommer les clusters
-df['Nom du Cluster'] = df.groupby('Cluster')['Requêtes les plus fréquentes'].transform(generate_cluster_name)
+    # Applique le TF-IDF et le clustering
+    vectorizer = TfidfVectorizer()
+    X = vectorizer.fit_transform(df['Requêtes les plus fréquentes'])
+    db = DBSCAN(eps=0.5, min_samples=2).fit(X.toarray())
 
-# Regroupe les données par cluster et calcule les sommes
-summary = df.groupby('Nom du Cluster').agg({
-    'Clics': 'sum',
-    'Impressions': 'sum',
-    'CTR': 'mean',
-    'Position': 'mean'
-}).reset_index()
+    # Ajoute les clusters au DataFrame
+    df['Cluster'] = db.labels_
 
-print(summary)
+    # Nommer les clusters
+    df['Nom du Cluster'] = df.groupby('Cluster')['Requêtes les plus fréquentes'].transform(generate_cluster_name)
+
+    # Regroupe les données par cluster et calcule les sommes
+    summary = df.groupby('Nom du Cluster').agg({
+        'Clics': 'sum',
+        'Impressions': 'sum',
+        'CTR': 'mean',
+        'Position': 'mean'
+    }).reset_index()
+
+    st.write(summary)
