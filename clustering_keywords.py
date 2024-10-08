@@ -18,9 +18,9 @@ if uploaded_file is not None:
             # Sélectionner le nombre de clusters avec un curseur
             num_clusters = st.slider("Sélectionnez le nombre de clusters", min_value=2, max_value=20, value=5, step=1)
 
-            # Vectorisation TF-IDF avec gestion des erreurs
+            # Vectorisation TF-IDF sans stop words
             try:
-                vectorizer = TfidfVectorizer(stop_words='french', token_pattern=r"(?u)\b\w\w+\b")
+                vectorizer = TfidfVectorizer(token_pattern=r"(?u)\b\w\w+\b")  # Pas de stop words
                 X = vectorizer.fit_transform(df['Requêtes les plus fréquentes'])
             except Exception as e:
                 st.error(f"Erreur lors de la vectorisation TF-IDF : {str(e)}")
