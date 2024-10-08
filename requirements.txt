@@ -1,5 +1,1 @@
-streamlit
-scikit-learn
-pandas
-matplotlib
-nltk
+pip install seaborn nltk pandas scikit-learn matplotlib streamlit
