@@ -46,8 +46,9 @@ if uploaded_file is not None:
 
             st.subheader("Sujets Parents des Clusters")
 
+            cluster_info = {}
+
             for cluster in unique_clusters:
-                st.write(f"**Sujet Parent du Cluster {cluster}:**")
                 words = df[df['Cluster'] == cluster]['Requêtes les plus fréquentes'].tolist()
                 
                 # Compter la fréquence des mots pour trouver le sujet parent
@@ -56,23 +57,36 @@ if uploaded_file is not None:
                     for w in word.split():
                         word_freq[w] += 1
                 
-                # Trouver le mot le plus commun
+                # Trouver les mots les plus communs
                 if word_freq:
-                    parent_topic = word_freq.most_common(1)[0][0]  # Le mot le plus fréquent
-                    st.write(f"- {parent_topic} (Mots associés: {len(words)})")
+                    parent_topic = ' '.join([word for word, count in word_freq.most_common(3)])  # Les 3 mots les plus fréquents
+                    cluster_info[cluster] = {
+                        'topic': parent_topic,
+                        'keywords': words,
+                        'size': len(words)
+                    }
+                    st.write(f"**Cluster {cluster} :** {parent_topic} (Mots associés: {len(words)})")
+                    if st.button(f"Afficher les mots-clés associés au Cluster {cluster}"):
+                        st.write(", ".join(words))
                 else:
                     st.write("- Aucune donnée disponible.")
 
                 st.markdown("---")  # Séparation entre les clusters
 
+            # Visualisation des clusters
             pca = PCA(n_components=2)
             X_pca = pca.fit_transform(X.toarray())
             df['PCA_1'] = X_pca[:, 0]
             df['PCA_2'] = X_pca[:, 1]
 
             plt.figure(figsize=(10, 6))
-            sns.scatterplot(x='PCA_1', y='PCA_2', hue='Cluster', data=df, palette='viridis', legend='full')
-            plt.title("Visualisation des Clusters avec DBSCAN")
+            for cluster, info in cluster_info.items():
+                plt.scatter(info['size'], cluster, s=info['size']*10, alpha=0.5, label=info['topic'])  # Taille proportionnelle aux mots-clés
+
+            plt.title("Visualisation des Clusters")
+            plt.xlabel("Taille des mots-clés")
+            plt.ylabel("Clusters")
+            plt.legend()
             st.pyplot(plt)
 
     except Exception as e:
