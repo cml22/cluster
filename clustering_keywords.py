@@ -4,10 +4,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+import seaborn as sns
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-import seaborn as sns
 
 nltk.download('stopwords')
 nltk.download('wordnet')
@@ -16,7 +16,6 @@ nltk.download('wordnet')
 def preprocess_text(text):
     lemmatizer = WordNetLemmatizer()
     stop_words = set(stopwords.words('french'))
-    # Tokenisation et lemmatisation
     words = text.split()
     words = [lemmatizer.lemmatize(word) for word in words if word.lower() not in stop_words]
     return ' '.join(words)
@@ -26,28 +25,23 @@ uploaded_file = st.file_uploader("Téléverser un fichier CSV", type=["csv"])
 if uploaded_file is not None:
     try:
         df = pd.read_csv(uploaded_file)
-        st.write(df.head())  # Afficher les premières lignes du fichier
+        st.write(df.head())
 
-        # Vérification si la colonne existe
         if 'Requêtes les plus fréquentes' not in df.columns:
             st.error("La colonne 'Requêtes les plus fréquentes' n'existe pas dans le fichier CSV.")
         else:
-            # Prétraitement
             df['Processed'] = df['Requêtes les plus fréquentes'].apply(preprocess_text)
 
-            # Vectorisation TF-IDF
             vectorizer = TfidfVectorizer()
             X = vectorizer.fit_transform(df['Processed'])
 
-            # Clustering avec DBSCAN
-            model = DBSCAN(eps=0.5, min_samples=2, metric='cosine')  # Ajustez les paramètres selon vos données
+            model = DBSCAN(eps=0.5, min_samples=2, metric='cosine')
             clusters = model.fit_predict(X)
             df['Cluster'] = clusters
 
-            # Vérifier les clusters formés
             unique_clusters = set(clusters)
             if -1 in unique_clusters:
-                unique_clusters.remove(-1)  # Supprimer le bruit
+                unique_clusters.remove(-1)
 
             st.subheader("Clusters et mots associés")
             for cluster in unique_clusters:
@@ -55,7 +49,6 @@ if uploaded_file is not None:
                 words = df[df['Cluster'] == cluster]['Requêtes les plus fréquentes'].tolist()
                 st.write(", ".join(words))
 
-            # Visualisation des clusters
             pca = PCA(n_components=2)
             X_pca = pca.fit_transform(X.toarray())
             df['PCA_1'] = X_pca[:, 0]
