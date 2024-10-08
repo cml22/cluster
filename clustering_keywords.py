@@ -25,3 +25,24 @@ else:
 
 # Use .empty to check if the keywords are empty
 if isinstance(keywords, pd.Series) and not keywords.empty:
+    # Continue with the clustering process
+    # Vectorize the keywords using TF-IDF
+    vectorizer = TfidfVectorizer()
+    X = vectorizer.fit_transform(keywords)
+
+    # Clustering using KMeans
+    num_clusters = st.slider("Nombre de clusters", 2, 10, 5)
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    kmeans.fit(X)
+
+    # Add cluster labels to the data
+    df['cluster'] = kmeans.labels_
+
+    # Export result as CSV
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(label="Télécharger les clusters", data=csv, file_name="clusters_keywords.csv", mime='text/csv')
+
+    # Display the clustered data
+    st.write(df)
+else:
+    st.warning("Aucun mot-clé disponible pour le clustering.")
