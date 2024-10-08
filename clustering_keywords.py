@@ -2,6 +2,16 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
+import numpy as np
+
+# Fonction pour extraire les mots-clés les plus fréquents d'un cluster
+def get_cluster_names(df, labels, num_clusters):
+    cluster_names = []
+    for i in range(num_clusters):
+        cluster_keywords = df['Requêtes les plus fréquentes'][labels == i]
+        most_common_keyword = cluster_keywords.value_counts().idxmax()
+        cluster_names.append(most_common_keyword)
+    return cluster_names
 
 # Upload or bulk input
 st.title("Clustering de mots-clés")
@@ -48,6 +58,10 @@ if isinstance(keywords, pd.Series) and not keywords.empty:
 
     # Add cluster labels to the data
     df['cluster'] = kmeans.labels_
+    
+    # Assigner des noms aux clusters basés sur les mots-clés les plus fréquents
+    cluster_names = get_cluster_names(df, kmeans.labels_, num_clusters)
+    df['Cluster Name'] = [cluster_names[label] for label in df['cluster']]
 
     # Export result as CSV
     csv = df.to_csv(index=False).encode('utf-8')
@@ -55,5 +69,4 @@ if isinstance(keywords, pd.Series) and not keywords.empty:
 
     # Display the clustered data
     st.write(df)
-else:
-    st.warning("Aucun mot-clé disponible pour le clustering.")
+else
