@@ -8,6 +8,7 @@ import seaborn as sns
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
+from collections import Counter
 
 nltk.download('stopwords')
 nltk.download('wordnet')
@@ -43,11 +44,26 @@ if uploaded_file is not None:
             if -1 in unique_clusters:
                 unique_clusters.remove(-1)
 
-            st.subheader("Clusters et mots associés")
+            st.subheader("Sujets Parents des Clusters")
+
             for cluster in unique_clusters:
-                st.write(f"**Cluster {cluster}:**")
+                st.write(f"**Sujet Parent du Cluster {cluster}:**")
                 words = df[df['Cluster'] == cluster]['Requêtes les plus fréquentes'].tolist()
-                st.write(", ".join(words))
+                
+                # Compter la fréquence des mots pour trouver le sujet parent
+                word_freq = Counter()
+                for word in words:
+                    for w in word.split():
+                        word_freq[w] += 1
+                
+                # Trouver le mot le plus commun
+                if word_freq:
+                    parent_topic = word_freq.most_common(1)[0][0]  # Le mot le plus fréquent
+                    st.write(f"- {parent_topic} (Mots associés: {len(words)})")
+                else:
+                    st.write("- Aucune donnée disponible.")
+
+                st.markdown("---")  # Séparation entre les clusters
 
             pca = PCA(n_components=2)
             X_pca = pca.fit_transform(X.toarray())
