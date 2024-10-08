@@ -1,9 +1,25 @@
 import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
-from collections import Counter
+from sklearn.cluster import DBSCAN
+from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+import seaborn as sns
+
+nltk.download('stopwords')
+nltk.download('wordnet')
+
+# Fonction de prétraitement
+def preprocess_text(text):
+    lemmatizer = WordNetLemmatizer()
+    stop_words = set(stopwords.words('french'))
+    # Tokenisation et lemmatisation
+    words = text.split()
+    words = [lemmatizer.lemmatize(word) for word in words if word.lower() not in stop_words]
+    return ' '.join(words)
 
 # Charger le fichier CSV
 uploaded_file = st.file_uploader("Téléverser un fichier CSV", type=["csv"])
@@ -16,53 +32,39 @@ if uploaded_file is not None:
         if 'Requêtes les plus fréquentes' not in df.columns:
             st.error("La colonne 'Requêtes les plus fréquentes' n'existe pas dans le fichier CSV.")
         else:
-            # Sélectionner le nombre de clusters avec un curseur
-            num_clusters = st.slider("Sélectionnez le nombre de clusters", min_value=2, max_value=20, value=5, step=1)
+            # Prétraitement
+            df['Processed'] = df['Requêtes les plus fréquentes'].apply(preprocess_text)
 
-            # Vectorisation TF-IDF sans stop words
-            try:
-                vectorizer = TfidfVectorizer(token_pattern=r"(?u)\b\w\w+\b")  # Pas de stop words
-                X = vectorizer.fit_transform(df['Requêtes les plus fréquentes'])
-            except Exception as e:
-                st.error(f"Erreur lors de la vectorisation TF-IDF : {str(e)}")
-                st.stop()
+            # Vectorisation TF-IDF
+            vectorizer = TfidfVectorizer()
+            X = vectorizer.fit_transform(df['Processed'])
 
-            # Clustering avec KMeans
-            try:
-                model = KMeans(n_clusters=num_clusters, random_state=42)
-                model.fit(X)
-                clusters = model.labels_
-                df['Cluster'] = clusters
-            except Exception as e:
-                st.error(f"Erreur lors du clustering : {str(e)}")
-                st.stop()
+            # Clustering avec DBSCAN
+            model = DBSCAN(eps=0.5, min_samples=2, metric='cosine')  # Ajustez les paramètres selon vos données
+            clusters = model.fit_predict(X)
+            df['Cluster'] = clusters
 
-            # Calculer le nombre de mots par cluster
-            cluster_word_count = Counter(clusters)
+            # Vérifier les clusters formés
+            unique_clusters = set(clusters)
+            if -1 in unique_clusters:
+                unique_clusters.remove(-1)  # Supprimer le bruit
 
-            # Afficher les clusters
             st.subheader("Clusters et mots associés")
-            for cluster in range(num_clusters):
+            for cluster in unique_clusters:
                 st.write(f"**Cluster {cluster}:**")
                 words = df[df['Cluster'] == cluster]['Requêtes les plus fréquentes'].tolist()
                 st.write(", ".join(words))
 
             # Visualisation des clusters
-            fig, ax = plt.subplots()
-            ax.bar(cluster_word_count.keys(), cluster_word_count.values())
-            ax.set_xlabel("Cluster")
-            ax.set_ylabel("Nombre de mots")
-            ax.set_title("Nombre de mots par cluster")
-            st.pyplot(fig)
+            pca = PCA(n_components=2)
+            X_pca = pca.fit_transform(X.toarray())
+            df['PCA_1'] = X_pca[:, 0]
+            df['PCA_2'] = X_pca[:, 1]
 
-            # Filtrage des clusters
-            st.subheader("Filtrer les clusters")
-            clusters_to_keep = st.multiselect("Sélectionnez les clusters à garder", list(range(num_clusters)), default=list(range(num_clusters)))
-
-            # Filtrer le DataFrame selon les clusters sélectionnés
-            filtered_df = df[df['Cluster'].isin(clusters_to_keep)]
-            st.write("DataFrame filtré:")
-            st.write(filtered_df)
+            plt.figure(figsize=(10, 6))
+            sns.scatterplot(x='PCA_1', y='PCA_2', hue='Cluster', data=df, palette='viridis', legend='full')
+            plt.title("Visualisation des Clusters avec DBSCAN")
+            st.pyplot(plt)
 
     except Exception as e:
         st.error(f"Erreur lors du traitement du fichier : {str(e)}")
