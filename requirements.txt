@@ -1,6 +1,6 @@
 streamlit
-pandas
 scikit-learn
+pandas
 matplotlib
-seaborn
 nltk
+seaborn
