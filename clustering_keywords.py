@@ -1,25 +1,20 @@
 import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
+from nltk.stem import PorterStemmer
 import matplotlib.pyplot as plt
 import re
 
-# Fonction pour extraire des mots-clés significatifs pour nommer les clusters
-def extract_significant_terms(keywords):
-    # Fonction pour normaliser les termes
+# Fonction pour normaliser et appliquer le stemming aux mots-clés
+def stem_keywords(keywords):
+    ps = PorterStemmer()
+    # Normalisation
     keywords = [re.sub(r'\d+', '', k) for k in keywords]  # Supprime les chiffres
     keywords = [k.strip().lower() for k in keywords]  # Mise en minuscule
-    return keywords
-
-# Fonction pour extraire les noms de clusters basés sur des mots-clés significatifs
-def get_cluster_names(df, labels, num_clusters):
-    cluster_names = []
-    for i in range(num_clusters):
-        cluster_keywords = df['Requêtes les plus fréquentes'][labels == i]
-        most_common_keyword = cluster_keywords.value_counts().idxmax()
-        cluster_names.append(most_common_keyword)
-    return cluster_names
+    # Application du stemming
+    stemmed_keywords = [' '.join([ps.stem(word) for word in k.split()]) for k in keywords]
+    return stemmed_keywords
 
 # Fonction pour préparer les données des clusters
 def prepare_cluster_data(df):
@@ -66,52 +61,49 @@ else:
 # Use .empty to check if the keywords are empty
 if isinstance(keywords, pd.Series) and not keywords.empty:
     # Continue with the clustering process
-    # Normaliser les termes
-    normalized_keywords = extract_significant_terms(keywords)
+    # Normaliser et appliquer le stemming
+    stemmed_keywords = stem_keywords(keywords)
 
-    # Vectorize the keywords using TF-IDF
+    # Vectoriser les mots-clés en utilisant TF-IDF
     vectorizer = TfidfVectorizer()
-    X = vectorizer.fit_transform(normalized_keywords)
+    X = vectorizer.fit_transform(stemmed_keywords)
 
-    # Clustering using KMeans
-    num_clusters = st.slider("Nombre de clusters", 2, 10, 5)
-    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-    kmeans.fit(X)
+    # Clustering using DBSCAN
+    db = DBSCAN(eps=0.5, min_samples=2).fit(X.toarray())
+    df['cluster'] = db.labels_
 
-    # Add cluster labels to the data
-    df['cluster'] = kmeans.labels_
+    # Filtrer les clusters non attribués (-1)
+    if len(df['cluster'].unique()) > 1:  # Plus d'un cluster
+        # Préparer les données des clusters
+        cluster_data = prepare_cluster_data(df)
 
-    # Assigner des noms aux clusters basés sur les mots-clés les plus significatifs
-    cluster_names = get_cluster_names(df, kmeans.labels_, num_clusters)
-    df['Cluster Name'] = [cluster_names[label] for label in df['cluster']]
+        # Visualisation sous forme de bulles
+        plt.figure(figsize=(10, 6))
+        plt.scatter(cluster_data['Nombre de Mots-Clés'], cluster_data['Total Clics'], 
+                    s=cluster_data['Total Impressions'] / 100, alpha=0.5)
 
-    # Préparer les données des clusters
-    cluster_data = prepare_cluster_data(df)
+        # Ajouter les noms de clusters avec annotations visuelles
+        for i in range(len(cluster_data)):
+            plt.annotate(f"Cluster {cluster_data['Cluster'][i]} (N={cluster_data['Nombre de Mots-Clés'][i]})", 
+                         (cluster_data['Nombre de Mots-Clés'][i], cluster_data['Total Clics'][i]),
+                         textcoords="offset points", 
+                         xytext=(0,10), 
+                         ha='center')
 
-    # Visualisation sous forme de bulles
-    plt.figure(figsize=(10, 6))
-    plt.scatter(cluster_data['Nombre de Mots-Clés'], cluster_data['Total Clics'], s=cluster_data['Total Impressions'] / 100, alpha=0.5)
+        plt.title('Visualisation des Clusters')
+        plt.xlabel('Nombre de Mots-Clés')
+        plt.ylabel('Total Clics')
+        plt.grid()
 
-    # Ajouter les noms de clusters avec annotations visuelles
-    for i in range(len(cluster_data)):
-        plt.annotate(f"{cluster_data['Cluster'][i]} (N={cluster_data['Nombre de Mots-Clés'][i]})", 
-                     (cluster_data['Nombre de Mots-Clés'][i], cluster_data['Total Clics'][i]),
-                     textcoords="offset points", 
-                     xytext=(0,10), 
-                     ha='center')
+        st.pyplot(plt)
 
-    plt.title('Visualisation des Clusters')
-    plt.xlabel('Nombre de Mots-Clés')
-    plt.ylabel('Total Clics')
-    plt.grid()
+        # Export result as CSV
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(label="Télécharger les clusters", data=csv, file_name="clusters_keywords.csv", mime='text/csv')
 
-    st.pyplot(plt)
-
-    # Export result as CSV
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button(label="Télécharger les clusters", data=csv, file_name="clusters_keywords.csv", mime='text/csv')
-
-    # Display the clustered data
-    st.write(df)
+        # Display the clustered data
+        st.write(df)
+    else:
+        st.warning("Aucun cluster valide trouvé. Essayez d'ajuster les paramètres de DBSCAN.")
 else:
     st.warning("Aucun mot-clé disponible pour le clustering.")
