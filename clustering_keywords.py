@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
-import numpy as np
+import matplotlib.pyplot as plt
 
 # Fonction pour extraire les mots-clés les plus fréquents d'un cluster
 def get_cluster_names(df, labels, num_clusters):
@@ -12,6 +12,17 @@ def get_cluster_names(df, labels, num_clusters):
         most_common_keyword = cluster_keywords.value_counts().idxmax()
         cluster_names.append(most_common_keyword)
     return cluster_names
+
+# Fonction pour préparer les données des clusters
+def prepare_cluster_data(df):
+    cluster_summary = df.groupby('cluster').agg({
+        'Clics': 'sum',
+        'Impressions': 'sum',
+        'Requêtes les plus fréquentes': 'count'
+    }).reset_index()
+
+    cluster_summary.columns = ['Cluster', 'Total Clics', 'Total Impressions', 'Nombre de Mots-Clés']
+    return cluster_summary
 
 # Upload or bulk input
 st.title("Clustering de mots-clés")
@@ -58,10 +69,27 @@ if isinstance(keywords, pd.Series) and not keywords.empty:
 
     # Add cluster labels to the data
     df['cluster'] = kmeans.labels_
-    
+
     # Assigner des noms aux clusters basés sur les mots-clés les plus fréquents
     cluster_names = get_cluster_names(df, kmeans.labels_, num_clusters)
     df['Cluster Name'] = [cluster_names[label] for label in df['cluster']]
+
+    # Préparer les données des clusters
+    cluster_data = prepare_cluster_data(df)
+
+    # Visualisation sous forme de bulles
+    plt.figure(figsize=(10, 6))
+    plt.scatter(cluster_data['Nombre de Mots-Clés'], cluster_data['Total Clics'], s=cluster_data['Total Impressions']/100, alpha=0.5)
+    plt.title('Visualisation des Clusters')
+    plt.xlabel('Nombre de Mots-Clés')
+    plt.ylabel('Total Clics')
+    plt.grid()
+    
+    # Ajouter les noms de clusters
+    for i in range(len(cluster_data)):
+        plt.annotate(cluster_data['Cluster'][i], (cluster_data['Nombre de Mots-Clés'][i], cluster_data['Total Clics'][i]))
+
+    st.pyplot(plt)
 
     # Export result as CSV
     csv = df.to_csv(index=False).encode('utf-8')
@@ -69,4 +97,5 @@ if isinstance(keywords, pd.Series) and not keywords.empty:
 
     # Display the clustered data
     st.write(df)
-else
+else:
+    st.warning("Aucun mot-clé disponible pour le clustering.")
